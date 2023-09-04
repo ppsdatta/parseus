@@ -1,11 +1,11 @@
 # parseus
 
-A simple parser combinator library in Clojure
+A Clojure library for simple monadic parser combinators.
 
 ## Usage
 
 ```clojure
-(def p1 (p-digit 9))
+  (def p1 (p-digit 9))
   (def p2 (p-char \c))
   (def p3 (p-or p1 p2))
 
@@ -54,19 +54,4 @@ A simple parser combinator library in Clojure
   (parse p-line2 "1234 4321 abcd")
   (parse p-line2 "1234 abcd")
 ```
-
-## License
-
 Copyright © 2023 soura.jagat@gmail.com
-
-This program and the accompanying materials are made available under the
-terms of the Eclipse Public License 2.0 which is available at
-http://www.eclipse.org/legal/epl-2.0.
-
-This Source Code may also be made available under the following Secondary
-Licenses when the conditions for such availability set forth in the Eclipse
-Public License, v. 2.0 are satisfied: GNU General Public License as published by
-the Free Software Foundation, either version 2 of the License, or (at your
-option) any later version, with the GNU Classpath Exception which is available
-at https://www.gnu.org/software/classpath/license.html.
-
