@@ -7,7 +7,17 @@
 
 (def digits (p-some (p-digit)))
 
-(def factor (p-seq (:= d1 digits)
+(def factor (p-seq (:= d1 (p-or
+                            (p-seq
+                              (p-char \()
+                              whitespace
+                              (:= t1 term)
+                              whitespace
+                              (p-char \))
+                              (return t1))
+                            (p-seq
+                              (:= d1 digits)
+                              (return (-> d1 some-value num-value)))))
                    (:= part (p-some
                               (p-seq
                                 whitespace
@@ -17,9 +27,9 @@
                                 (:= d2 factor)
                                 (return {:op op :num2 d2}))))
                    (return (if (fail? (some-value part))
-                             (-> d1 some-value num-value)
+                             d1
                              {:op   (-> part first :op)
-                              :args [(num-value d1)
+                              :args [d1
                                      (-> part first :num2)]}))))
 
 (def term (p-seq
@@ -38,5 +48,28 @@
                        :args [f1 (-> part first :f2)]}))))
 
 (parse term "2*102 + 32 * 3 - 34")
-(parse factor "23 * 334 / 3 * 12")
+(parse term "23 * 334 / 3 * 12")
 (parse term "")
+(parse term "(2 + 3 ) *(5 - (11 / 11) )")
+(parse term "42")
+
+(def op-map {\+ +
+             \- -
+             \* *
+             \/ /})
+
+(defn term-eval [term]
+  (if (number? term)
+    term
+    (let [op (:op term)
+          axs (map term-eval (:args term))]
+      (apply (op-map op) axs))))
+
+(defn calc [s]
+  (->> s
+       (parse term)
+       first
+       term-eval))
+
+(calc "23 * 3 / (4 - 21)")
+
