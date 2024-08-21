@@ -50,7 +50,7 @@
 (parse term "2*102 + 32 * 3 - 34")
 (parse term "23 * 334 / 3 * 12")
 (parse term "")
-(parse term "(2 + 3 ) *(5 - (11 / 11) )")
+(parse term "(2 + 3 * 99 ) *(5 - (11 / 11) )")
 (parse term "42")
 
 (def op-map {\+ +
@@ -72,4 +72,6 @@
        term-eval))
 
 (calc "23 * 3 / (4 - 21)")
+(calc "23 * 3 + 4 / 2")
+(calc "(2 + 3 * 99 ) *(5 - (11 / 11) )")
 
