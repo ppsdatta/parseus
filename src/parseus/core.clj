@@ -157,6 +157,17 @@
          (:= t (p-some p))
          (return (cons h (some-value t)))))
 
+(defn p-skip [p]
+  (p-fmap (constantly nil) p))
+
+(def p-whitespace
+  (p-some (p-satisfy #(Character/isWhitespace %))))
+
+(defn p-token [p]
+  (p-seq p-whitespace
+         (:= v p)
+         (return v)))
+
 
 
 (comment

@@ -244,6 +244,62 @@
     (let [r (parse (p-fmap num-value (p-many (p-digit))) "99end")]
       (is (= (first r) 99)))))
 
+(deftest p-skip-tests
+  (testing "Runs the parser but discards the value, returning nil."
+    (let [r (parse (p-skip (p-digit)) "3abc")]
+      (is (nil? (first r)))
+      (is (= (second r) "abc"))))
+
+  (testing "Propagates failure."
+    (is (fail? (parse (p-skip (p-digit)) "abc"))))
+
+  (testing "Useful inside p-seq to consume input without binding."
+    (let [p (p-seq (p-skip (p-char \())
+                   (:= n (p-some (p-digit)))
+                   (p-skip (p-char \)))
+                   (return (num-value n)))
+          r (parse p "(42)rest")]
+      (is (= (first r) 42))
+      (is (= (second r) "rest")))))
+
+(deftest p-whitespace-tests
+  (testing "Consumes one or more spaces."
+    (let [r (parse p-whitespace "   abc")]
+      (is (= (second r) "abc"))))
+
+  (testing "Consumes tabs and newlines."
+    (let [r (parse p-whitespace "\t\nabc")]
+      (is (= (second r) "abc"))))
+
+  (testing "Succeeds with zero whitespace — input unchanged."
+    (let [r (parse p-whitespace "abc")]
+      (is (= (second r) "abc"))))
+
+  (testing "Succeeds on empty input."
+    (let [r (parse p-whitespace "")]
+      (is (= (second r) "")))))
+
+(deftest p-token-tests
+  (testing "Skips leading whitespace then runs parser."
+    (let [r (parse (p-token (p-some (p-digit))) "   42rest")]
+      (is (= (some-value (first r)) [4 2]))
+      (is (= (second r) "rest"))))
+
+  (testing "Works with no leading whitespace."
+    (let [r (parse (p-token (p-some (p-digit))) "42rest")]
+      (is (= (some-value (first r)) [4 2]))))
+
+  (testing "Fails if inner parser fails after skipping whitespace."
+    (is (fail? (parse (p-token (p-digit)) "   abc"))))
+
+  (testing "Tokenised sequence — each token skips its own leading whitespace."
+    (let [p (p-seq (:= a (p-token (p-some (p-digit))))
+                   (:= b (p-token (p-some (p-digit))))
+                   (return [(num-value a) (num-value b)]))
+          r (parse p "  12   34end")]
+      (is (= (first r) [12 34]))
+      (is (= (second r) "end")))))
+
 (deftest p-collect-tests
   (testing "Collects results of each parser into a vector."
     (let [r (parse (p-collect (p-char \c) (p-char \+) (p-char \+)) "c++ is cool")]
