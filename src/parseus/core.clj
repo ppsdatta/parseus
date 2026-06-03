@@ -24,17 +24,20 @@
     []
     sm))
 
+(defn p-satisfy [pred]
+  (fn [s]
+    (if (empty? s)
+      []
+      (let [c (.charAt s 0)]
+        (if (pred c) [c (.substring s 1)] [])))))
+
 (defn p-digit
   ([]
    (fn [s]
-     (if (= (.length s) 0)
-       []
-       (let [c (int (.charAt s 0))]
-         (if (and (>= c (int \0))
-                  (<= c (int \9)))
-           [(- c (int \0))
-            (.substring s 1)]
-           [])))))
+     (let [r ((p-satisfy #(Character/isDigit %)) s)]
+       (if (fail? r)
+         []
+         [(- (int (first r)) (int \0)) (second r)]))))
   ([n]
    (fn [s]
      (let [[d rs] ((p-digit) s)]
@@ -44,17 +47,19 @@
 
 (defn p-char
   ([]
-   (fn [s]
-     (if (= (.length s) 0)
-       []
-       [(.charAt s 0)
-        (.substring s 1)])))
+   (p-satisfy (constantly true)))
   ([c]
-   (fn [s]
-     (let [[c0 rs] ((p-char) s)]
-       (if (and c0 (= c0 c))
-         [c0 rs]
-         [])))))
+   (p-satisfy #(= % c))))
+
+(defn p-any-of [chars]
+  (p-satisfy (set chars)))
+
+(defn p-none-of [chars]
+  (p-satisfy (complement (set chars))))
+
+(def p-eof
+  (fn [s]
+    (if (empty? s) [nil s] [])))
 
 (defn p-or [p1 p2]
   (fn [s]
@@ -63,12 +68,36 @@
         (p2 s)
         o))))
 
-(defn p-some [p]
-  (fn [s & {:keys [acm] :or {acm []}}]
-    (let [r (parse p s)]
+(defn p-fmap [f p]
+  (fn [s]
+    (let [r (p s)]
       (if (fail? r)
-        [(if (empty? acm) [:none] acm) s]
-        (recur (r 1) {:acm (conj acm (r 0))})))))
+        []
+        [(f (first r)) (second r)]))))
+
+(defn p-collect [& parsers]
+  (fn [s]
+    (loop [parsers parsers, s s, acm []]
+      (if (empty? parsers)
+        [acm s]
+        (let [r ((first parsers) s)]
+          (if (fail? r)
+            []
+            (recur (rest parsers) (second r) (conj acm (first r)))))))))
+
+(defn p-str [s]
+  (apply p-collect (map p-char s)))
+
+(defn p-some [p]
+  (fn [s]
+    (loop [s s, acm []]
+      (let [r (parse p s)]
+        (if (or (fail? r) (= (r 1) s))
+          [(if (empty? acm) [:none] acm) s]
+          (recur (r 1) (conj acm (r 0))))))))
+
+(defn p-optional [p]
+  (p-or p (fn [s] [nil s])))
 
 ;(p-seq
 ;  (:= number1 (p-some (p-digit)))
@@ -97,16 +126,18 @@
       ~rs]))
 
 (defmacro assign-expr [rs xs]
-  `(let [[~(second (first xs)) _rs#] (~(nth (first xs) 2) ~rs)]
-     (if (fail? ~(second (first xs)))
-       ~(second (first xs))
-       (seq-exprs _rs# ~(rest xs)))))
+  `(let [_r# (~(nth (first xs) 2) ~rs)]
+     (if (fail? _r#)
+       _r#
+       (let [[~(second (first xs)) _rs#] _r#]
+         (seq-exprs _rs# ~(rest xs))))))
 
 (defmacro non-assign-expr [rs xs]
-  `(let [[_x# _rs#] (~(first xs) ~rs)]
-     (if (fail? _x#)
-       _x#
-       (seq-exprs _rs# ~(rest xs)))))
+  `(let [_r# (~(first xs) ~rs)]
+     (if (fail? _r#)
+       _r#
+       (let [[_x# _rs#] _r#]
+         (seq-exprs _rs# ~(rest xs))))))
 
 (defmacro seq-exprs [rs xs]
   (cond
@@ -120,6 +151,11 @@
 (defmacro p-seq [& xs]
   `(fn [s#]
      (seq-exprs s# ~xs)))
+
+(defn p-many [p]
+  (p-seq (:= h p)
+         (:= t (p-some p))
+         (return (cons h (some-value t)))))
 
 
 
