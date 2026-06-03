@@ -300,6 +300,105 @@
       (is (= (first r) [12 34]))
       (is (= (second r) "end")))))
 
+(deftest p-look-ahead-tests
+  (testing "Returns parsed value without consuming input."
+    (let [r (parse (p-look-ahead (p-digit)) "3abc")]
+      (is (= (first r) 3))
+      (is (= (second r) "3abc"))))
+
+  (testing "Fails if the inner parser fails."
+    (is (fail? (parse (p-look-ahead (p-digit)) "abc"))))
+
+  (testing "Useful to branch without committing — input always preserved."
+    (let [p (p-seq (:= d (p-look-ahead (p-digit)))
+                   (:= n (p-some (p-digit)))
+                   (return {:peeked d :all (some-value n)}))
+          r (parse p "42rest")]
+      (is (= (first r) {:peeked 4 :all [4 2]})))))
+
+(deftest p-not-followed-by-tests
+  (testing "Succeeds when inner parser fails — consumes nothing."
+    (let [r (parse (p-not-followed-by (p-digit)) "abc")]
+      (is (nil? (first r)))
+      (is (= (second r) "abc"))))
+
+  (testing "Fails when inner parser succeeds."
+    (is (fail? (parse (p-not-followed-by (p-digit)) "3abc"))))
+
+  (testing "Succeeds on empty input when inner parser would fail."
+    (let [r (parse (p-not-followed-by (p-digit)) "")]
+      (is (nil? (first r)))
+      (is (= (second r) "")))))
+
+(deftest p-keyword-tests
+  (testing "Matches keyword followed by non-alphanumeric."
+    (let [r (parse (p-keyword "if") "if (x)")]
+      (is (= (first r) "if"))
+      (is (= (second r) " (x)"))))
+
+  (testing "Fails when keyword is a prefix of a longer identifier."
+    (is (fail? (parse (p-keyword "if") "iffy"))))
+
+  (testing "Succeeds when keyword is at end of input."
+    (let [r (parse (p-keyword "end") "end")]
+      (is (= (first r) "end"))
+      (is (= (second r) ""))))
+
+  (testing "Fails on non-matching input."
+    (is (fail? (parse (p-keyword "begin") "end")))))
+
+(deftest p-between-tests
+  (testing "Parses open/content/close and returns content."
+    (let [r (parse (p-between (p-char \() (p-char \)) (p-some (p-digit))) "(123)rest")]
+      (is (= (some-value (first r)) [1 2 3]))
+      (is (= (second r) "rest"))))
+
+  (testing "Fails if open is missing."
+    (is (fail? (parse (p-between (p-char \() (p-char \)) (p-digit)) "3)"))))
+
+  (testing "Fails if close is missing."
+    (is (fail? (parse (p-between (p-char \() (p-char \)) (p-digit)) "(3x"))))
+
+  (testing "Works with p-token for whitespace-tolerant bracketing."
+    (let [r (parse (p-between (p-token (p-char \[))
+                              (p-token (p-char \]))
+                              (p-token (p-some (p-digit))))
+                   "[ 42 ]rest")]
+      (is (= (some-value (first r)) [4 2])))))
+
+(deftest p-sep-by1-tests
+  (testing "Parses one-or-more items separated by sep."
+    (let [r (parse (p-sep-by1 (p-some (p-digit)) (p-char \,)) "1,22,333end")]
+      (is (= (map num-value (first r)) '(1 22 333)))
+      (is (= (second r) "end"))))
+
+  (testing "Succeeds with a single item and no separator."
+    (let [r (parse (p-sep-by1 (p-some (p-digit)) (p-char \,)) "42rest")]
+      (is (= (num-value (first (first r))) 42))))
+
+  (testing "Fails on empty input."
+    (is (fail? (parse (p-sep-by1 (p-digit) (p-char \,)) "")))))
+
+(deftest p-sep-by-tests
+  (testing "Parses zero-or-more items — succeeds on empty."
+    (let [r (parse (p-sep-by (p-digit) (p-char \,)) "abc")]
+      (is (= (first r) []))
+      (is (= (second r) "abc"))))
+
+  (testing "Parses one item."
+    (let [r (parse (p-sep-by (p-digit) (p-char \,)) "3abc")]
+      (is (= (first r) '(3)))))
+
+  (testing "Parses multiple items."
+    (let [r (parse (p-sep-by (p-digit) (p-char \,)) "1,2,3rest")]
+      (is (= (first r) '(1 2 3)))
+      (is (= (second r) "rest"))))
+
+  (testing "Does not consume trailing separator."
+    (let [r (parse (p-sep-by (p-digit) (p-char \,)) "1,2,rest")]
+      (is (= (first r) '(1 2)))
+      (is (= (second r) ",rest")))))
+
 (deftest p-collect-tests
   (testing "Collects results of each parser into a vector."
     (let [r (parse (p-collect (p-char \c) (p-char \+) (p-char \+)) "c++ is cool")]

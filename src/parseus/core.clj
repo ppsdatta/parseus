@@ -168,6 +168,36 @@
          (:= v p)
          (return v)))
 
+(defn p-look-ahead [p]
+  (fn [s]
+    (let [r (p s)]
+      (if (fail? r)
+        []
+        [(first r) s]))))
+
+(defn p-not-followed-by [p]
+  (fn [s]
+    (if (fail? (p s))
+      [nil s]
+      [])))
+
+(defn p-keyword [kw]
+  (p-seq (:= _ (p-str kw))
+         (p-not-followed-by (p-satisfy #(Character/isLetterOrDigit %)))
+         (return kw)))
+
+(defn p-between [open close p]
+  (p-seq open (:= v p) close (return v)))
+
+(defn p-sep-by1 [p sep]
+  (p-seq (:= h p)
+         (:= t (p-some (p-seq sep (:= v p) (return v))))
+         (return (cons h (some-value t)))))
+
+(defn p-sep-by [p sep]
+  (p-or (p-sep-by1 p sep)
+        (fn [s] [[] s])))
+
 
 
 (comment
