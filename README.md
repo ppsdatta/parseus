@@ -1,5 +1,7 @@
 # parseus
 
+[![Clojars Project](https://img.shields.io/clojars/v/net.clojars.souravdatta/parseus.svg)](https://clojars.org/net.clojars.souravdatta/parseus)
+
 A Clojure parser combinator library. Parsers are plain functions `String → [value rest]` on success, `[]` on failure, composed with a small set of combinators.
 
 See [doc/api.md](doc/api.md) for the full API reference.
