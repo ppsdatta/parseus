@@ -458,6 +458,72 @@
           r (parse p "c++ is cool")]
       (is (= (first r) {:lang "c++" :desc "is cool"})))))
 
+(deftest p-chain-left-tests
+  (testing "Left-folds: 1+2+3 = (1+2)+3 = 6."
+    (let [p-num (p-fmap num-value (p-many (p-digit)))
+          p-op  (p-fmap {\+ + \- -} (p-any-of [\+ \-]))
+          r (parse (p-chain-left p-num p-op) "1+2+3end")]
+      (is (= (first r) 6))
+      (is (= (second r) "end"))))
+
+  (testing "Single value with no operator returns value unchanged."
+    (let [p-num (p-fmap num-value (p-many (p-digit)))
+          p-op  (p-fmap {\+ +} (p-char \+))
+          r (parse (p-chain-left p-num p-op) "42rest")]
+      (is (= (first r) 42))))
+
+  (testing "Left-associativity: 10-3-2 = (10-3)-2 = 5."
+    (let [p-num (p-fmap num-value (p-many (p-digit)))
+          p-op  (p-fmap {\- -} (p-char \-))
+          r (parse (p-chain-left p-num p-op) "10-3-2end")]
+      (is (= (first r) 5)))))
+
+(deftest p-chain-right-tests
+  (testing "Right-folds: 1-2-3 = 1-(2-3) = 2."
+    (let [p-num (p-fmap num-value (p-many (p-digit)))
+          p-op  (p-fmap {\- -} (p-char \-))
+          r (parse (p-chain-right p-num p-op) "1-2-3end")]
+      (is (= (first r) 2))
+      (is (= (second r) "end"))))
+
+  (testing "Single value with no operator returns value unchanged."
+    (let [p-num (p-fmap num-value (p-many (p-digit)))
+          p-op  (p-fmap {\- -} (p-char \-))
+          r (parse (p-chain-right p-num p-op) "42rest")]
+      (is (= (first r) 42)))))
+
+(deftest p-comment-tests
+  (testing "Simple comment is consumed and returns nil."
+    (let [r (parse p-comment "(* hello world *)rest")]
+      (is (nil? (first r)))
+      (is (= (second r) "rest"))))
+
+  (testing "Empty comment."
+    (let [r (parse p-comment "(**)rest")]
+      (is (nil? (first r)))
+      (is (= (second r) "rest"))))
+
+  (testing "Nested comment."
+    (let [r (parse p-comment "(* outer (* inner *) outer *)rest")]
+      (is (nil? (first r)))
+      (is (= (second r) "rest"))))
+
+  (testing "Deeply nested comment."
+    (let [r (parse p-comment "(* a (* b (* c *) b *) a *)rest")]
+      (is (nil? (first r)))
+      (is (= (second r) "rest"))))
+
+  (testing "Fails on unclosed comment."
+    (is (fail? (parse p-comment "(* no close"))))
+
+  (testing "Usable as a non-binding step in p-seq."
+    (let [p (p-seq p-comment
+                   (p-token (p-some (p-digit)))
+                   (:= n (p-token (p-some (p-digit))))
+                   (return (num-value n)))
+          r (parse p "(* skip *) 42 99")]
+      (is (= (first r) 99)))))
+
 (deftest p-some-tests
   (testing "Single match returns one-element list."
     (let [r (parse (p-some (p-digit)) "1abc")]

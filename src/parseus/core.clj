@@ -198,6 +198,38 @@
   (p-or (p-sep-by1 p sep)
         (fn [s] [[] s])))
 
+(defmacro p-ref [v]
+  `(fn [s#] (~v s#)))
+
+(defn p-chain-left [p op]
+  (p-seq (:= first-val p)
+         (:= pairs (p-some (p-seq (:= f op) (:= v p) (return [f v]))))
+         (return (reduce (fn [acc [f v]] (f acc v))
+                         first-val
+                         (some-value pairs)))))
+
+(defn p-chain-right [p op]
+  (p-seq (:= first-val p)
+         (:= pairs (p-some (p-seq (:= f op) (:= v p) (return [f v]))))
+         (return (let [ps   (some-value pairs)
+                       vals (vec (cons first-val (map second ps)))
+                       ops  (vec (map first ps))]
+                   (reduce (fn [acc i] ((ops i) (vals i) acc))
+                           (peek vals)
+                           (reverse (range (count ops))))))))
+
+(declare p-comment)
+
+(def p-comment
+  (fn [s]
+    ((p-seq (p-str "(*")
+            (p-some (p-or (p-ref p-comment)
+                          (p-seq (p-not-followed-by (p-str "*)"))
+                                 (p-char)
+                                 (return nil))))
+            (p-str "*)")
+            (return nil)) s)))
+
 
 
 (comment
