@@ -61,12 +61,12 @@
   (fn [s]
     (if (empty? s) [nil s] [])))
 
-(defn p-or [p1 p2]
-  (fn [s]
-    (let [o (p1 s)]
-      (if (fail? o)
-        (p2 s)
-        o))))
+(defn p-or [p1 p2 & ps]
+  (let [binary (fn [p1 p2]
+                 (fn [s]
+                   (let [o (p1 s)]
+                     (if (fail? o) (p2 s) o))))]
+    (reduce binary (binary p1 p2) ps)))
 
 (defn p-fmap [f p]
   (fn [s]
@@ -86,7 +86,7 @@
             (recur (rest parsers) (second r) (conj acm (first r)))))))))
 
 (defn p-str [s]
-  (apply p-collect (map p-char s)))
+  (p-fmap str-value (apply p-collect (map p-char s))))
 
 (defn p-some [p]
   (fn [s]

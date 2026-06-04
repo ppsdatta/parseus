@@ -426,14 +426,10 @@
       (is (= (str-value (first r)) "hi")))))
 
 (deftest p-str-tests
-  (testing "Matches a literal string and returns chars."
+  (testing "Matches a literal string and returns a string."
     (let [r (parse (p-str "c++") "c++ is cool")]
-      (is (= (first r) [\c \+ \+]))
+      (is (= (first r) "c++"))
       (is (= (second r) " is cool"))))
-
-  (testing "str-value on result gives back the original string."
-    (let [r (parse (p-str "hello") "hello world")]
-      (is (= (str-value (first r)) "hello"))))
 
   (testing "Fails when input does not start with the literal."
     (is (fail? (parse (p-str "c++") "java is verbose"))))
@@ -445,16 +441,16 @@
     (let [r (parse (p-str "clojure") "clojure rocks")]
       (is (= (second r) " rocks"))))
 
-  (testing "Empty string matches everything, returns empty vector."
+  (testing "Empty string matches everything, returns empty string."
     (let [r (parse (p-str "") "anything")]
-      (is (= (first r) []))
+      (is (= (first r) ""))
       (is (= (second r) "anything"))))
 
-  (testing "p-str inside p-seq."
+  (testing "p-str inside p-seq — result is already a string, no str-value needed."
     (let [p (p-seq (:= lang (p-str "c++"))
                    (p-char \space)
                    (:= rest (p-some (p-char)))
-                   (return {:lang (str-value lang) :desc (str-value rest)}))
+                   (return {:lang lang :desc (str-value rest)}))
           r (parse p "c++ is cool")]
       (is (= (first r) {:lang "c++" :desc "is cool"})))))
 
@@ -566,15 +562,37 @@
       (is (= (second r) "b")))))
 
 (deftest or-test
-  (testing "Test p-or."
-    (let [p1 (p-or (p-digit 0)
-                   (p-char \H))
+  (testing "Binary p-or tries first then second."
+    (let [p1 (p-or (p-digit 0) (p-char \H))
           r1 (parse p1 "0 Code")
           r2 (parse p1 "Hello")
           r3 (parse p1 "#include")]
-      (is (= (-> r1 first) 0))
-      (is (= (-> r2 first) \H))
-      (is (fail? r3)))))
+      (is (= (first r1) 0))
+      (is (= (first r2) \H))
+      (is (fail? r3))))
+
+  (testing "Variadic p-or tries each alternative in order."
+    (let [p (p-or (p-char \a) (p-char \b) (p-char \c) (p-char \d))
+          ra (parse p "apricot")
+          rb (parse p "banana")
+          rd (parse p "durian")
+          rx (parse p "xyz")]
+      (is (= (first ra) \a))
+      (is (= (first rb) \b))
+      (is (= (first rd) \d))
+      (is (fail? rx))))
+
+  (testing "Variadic p-or — useful for multi-way keyword dispatch."
+    (let [p (p-or (p-keyword "if")
+                  (p-keyword "while")
+                  (p-keyword "for")
+                  (p-keyword "return"))
+          r1 (parse p "if (x)")
+          r2 (parse p "while true")
+          r3 (parse p "return 42")]
+      (is (= (first r1) "if"))
+      (is (= (first r2) "while"))
+      (is (= (first r3) "return")))))
 
 (deftest line-test
   (testing "A line with a fixed format."
